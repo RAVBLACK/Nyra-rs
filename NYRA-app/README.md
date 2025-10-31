@@ -148,20 +148,6 @@ We welcome contributions! Please follow these steps:
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 👥 Development Team
-
-- **Project Lead**: [Your Name]
-- **Mobile Developer**: [Team Member]
-- **ML Engineer**: [Team Member]
-- **UI/UX Designer**: [Team Member]
-
-## 📞 Support
-
-For support, email safety-support@nyra-app.com or create an issue in this repository.
 
 ## 🙏 Acknowledgments
 
