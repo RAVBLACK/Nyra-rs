@@ -25,7 +25,7 @@ const notifyListeners = () => {
 export const subscribeToActivity = (callback) => {
   listeners.push(callback);
   // Immediately call back with the current state
-  callback(latestActivityState); 
+  callback(latestActivityState);
   return () => {
     listeners = listeners.filter(listener => listener !== callback);
   };
@@ -44,7 +44,7 @@ class HARModelService {
     this.lastActivity = 'IDLE';
     this.activityChangeCount = 0;
     this.sensorUnsubscribe = null;
-    
+
     // Enhanced sudden stop detection variables
     this.movementHistory = []; // Track movement levels over time
     this.highMovementDuration = 0; // How long we've been in high movement
@@ -60,14 +60,14 @@ class HARModelService {
 
   start() {
     this.isMonitoring = true;
-    
+
     // Import and subscribe to sensor data
     import('./sensorService').then(({ subscribeToSensorData }) => {
       this.sensorUnsubscribe = subscribeToSensorData((sensorData) => {
         this.predictActivity(sensorData);
       });
     });
-    
+
     latestActivityState = { ...latestActivityState, isProtectionActive: true };
     notifyListeners();
     console.log('HAR Model Service Started');
@@ -76,16 +76,16 @@ class HARModelService {
   stop() {
     this.isMonitoring = false;
     this.sensorDataBuffer = [];
-    
+
     // Unsubscribe from sensor data
     if (this.sensorUnsubscribe) {
       this.sensorUnsubscribe();
       this.sensorUnsubscribe = null;
     }
-    
-    latestActivityState = { 
-      name: 'IDLE', 
-      confidence: 1.0, 
+
+    latestActivityState = {
+      name: 'IDLE',
+      confidence: 1.0,
       isProtectionActive: false,
       anomaly: null,
     };
@@ -104,9 +104,9 @@ class HARModelService {
   _calculateMagnitude(x, y, z) {
     // Validate inputs
     const validX = isFinite(x) ? x : 0;
-    const validY = isFinite(y) ? y : 0; 
+    const validY = isFinite(y) ? y : 0;
     const validZ = isFinite(z) ? z : 0;
-    
+
     const magnitude = Math.sqrt(validX * validX + validY * validY + validZ * validZ);
     return isFinite(magnitude) ? magnitude : 0;
   }
@@ -116,14 +116,14 @@ class HARModelService {
    */
   _calculateVariance(arr) {
     if (!arr || arr.length < 2) return 0;
-    
+
     // Filter out invalid values
     const validValues = arr.filter(val => typeof val === 'number' && isFinite(val));
     if (validValues.length < 2) return 0;
-    
+
     const mean = validValues.reduce((a, b) => a + b, 0) / validValues.length;
     const variance = validValues.reduce((a, b) => a + (b - mean) ** 2, 0) / validValues.length;
-    
+
     return isFinite(variance) ? variance : 0;
   }
 
@@ -177,7 +177,7 @@ class HARModelService {
     // High (1): Easier to trigger (lower thresholds)
     const sensitivity = this.settings.detectionSensitivity;
     const modifier = 1 - sensitivity; // Low=1, Med=0.5, High=0
-    
+
     const MOVEMENT_THRESHOLD_IDLE = BASE_MOVEMENT_THRESHOLD_IDLE * (1 + modifier * 0.6);      // Low: 0.8, Med: 0.65, High: 0.5
     const MOVEMENT_THRESHOLD_STANDING = BASE_MOVEMENT_THRESHOLD_STANDING * (1 + modifier * 0.6); // Low: 3.2, Med: 2.6, High: 2.0
     const MOVEMENT_THRESHOLD_WALKING = BASE_MOVEMENT_THRESHOLD_WALKING * (1 + modifier * 0.4);   // Low: 11.2, Med: 9.6, High: 8.0
@@ -189,7 +189,7 @@ class HARModelService {
     const gyroMagnitudes = this.sensorDataBuffer.map(d => this._calculateMagnitude(d.gx, d.gy, d.gz));
 
     // Remove gravity component for better motion detection
-    const meanAccel = accelMagnitudes.length > 0 ? 
+    const meanAccel = accelMagnitudes.length > 0 ?
       accelMagnitudes.reduce((a, b) => a + b, 0) / accelMagnitudes.length : 0;
     const validMeanAccel = isFinite(meanAccel) ? meanAccel : 0;
     const accelWithoutGravity = accelMagnitudes.map(mag => Math.abs(mag - validMeanAccel));
@@ -203,10 +203,10 @@ class HARModelService {
 
     // Weighted movement score - gyroscope captures rotational movement better for walking detection
     const totalMovement = (validAccelVariance * 15) + (validGyroVariance * 85);
-    
+
     // Validate total movement to prevent NaN
     const validTotalMovement = isFinite(totalMovement) ? totalMovement : 0;
-    
+
     console.log(`🔍 HAR Debug: accel=${validAccelVariance.toFixed(3)}, gyro=${validGyroVariance.toFixed(3)}, total=${validTotalMovement.toFixed(3)}`);
 
     let activity = 'IDLE';
@@ -247,14 +247,14 @@ class HARModelService {
     // --- Improved Activity Smoothing ---
     if (activity !== this.lastActivity) {
       this.activityChangeCount++;
-      
+
       // Different smoothing rules for different transitions
-      const needsSmoothing = 
+      const needsSmoothing =
         (this.lastActivity === 'IDLE' && activity === 'STANDING' && this.activityChangeCount < 3) ||
         (this.lastActivity === 'STANDING' && activity === 'IDLE' && this.activityChangeCount < 3) ||
         (this.lastActivity === 'STANDING' && activity === 'WALKING' && this.activityChangeCount < 2) ||
         (this.lastActivity === 'WALKING' && activity === 'STANDING' && this.activityChangeCount < 2);
-      
+
       if (needsSmoothing) {
         // Keep previous activity but reduce confidence
         activity = this.lastActivity;
@@ -278,7 +278,7 @@ class HARModelService {
     const isHighMovement = activity === 'WALKING' || activity === 'RUNNING';
     const isStill = activity === 'IDLE';
     const timeSinceLastTrigger = Date.now() - this.lastSuddenStopTime;
-    
+
     // Track walking session
     if (isHighMovement) {
       this.highMovementDuration++;
@@ -297,35 +297,36 @@ class HARModelService {
     }
 
     // EXTREMELY conservative sudden stop detection - only trigger in very specific conditions
-    if (this.movementHistory.length >= 50 && 
-        this.walkingSessionActive && 
-        this.highMovementDuration >= 50 && // Must be walking for 5+ seconds
-        timeSinceLastTrigger > 30000) { // At least 30 seconds since last trigger
-      
+    if (this.movementHistory.length >= 50 &&
+      this.walkingSessionActive &&
+      this.highMovementDuration >= 50 && // Must be walking for 5+ seconds
+      timeSinceLastTrigger > 30000) { // At least 30 seconds since last trigger
+
       const recentMovement = this.movementHistory.slice(-3); // Last 0.3 seconds
       const previousMovement = this.movementHistory.slice(-20, -10); // 1 second ago
       const longTermMovement = this.movementHistory.slice(-50, -20); // 2-3 seconds ago
-      
+
       const avgRecent = recentMovement.reduce((a, b) => a + b, 0) / recentMovement.length;
       const avgPrevious = previousMovement.reduce((a, b) => a + b, 0) / previousMovement.length;
       const avgLongTerm = longTermMovement.reduce((a, b) => a + b, 0) / longTermMovement.length;
-      
+
       const movementDrop = (avgPrevious - avgRecent) / avgPrevious;
-      const consistentHighMovement = avgLongTerm > MOVEMENT_THRESHOLD_WALKING * 1.5 && 
-                                   avgPrevious > MOVEMENT_THRESHOLD_WALKING * 1.5;
-      
+      const consistentHighMovement = avgLongTerm > MOVEMENT_THRESHOLD_WALKING * 1.5 &&
+        avgPrevious > MOVEMENT_THRESHOLD_WALKING * 1.5;
+
       // Only trigger if:
       // 1. Movement drop is VERY dramatic (>90%)
       // 2. Previous movement was consistently high
       // 3. Current movement is very low (near idle)
       // 4. We're confident this is running/fast walking, not just normal walking
-      if (movementDrop > 0.9 && 
-          consistentHighMovement && 
-          avgRecent < MOVEMENT_THRESHOLD_IDLE * 2 &&
-          avgPrevious > MOVEMENT_THRESHOLD_RUNNING * 0.8) { // Must be running-level movement
-        
+      if (movementDrop > 0.9 &&
+        consistentHighMovement &&
+        avgRecent < MOVEMENT_THRESHOLD_IDLE * 2 &&
+        avgPrevious > MOVEMENT_THRESHOLD_RUNNING * 0.8) { // Must be running-level movement
+
         anomaly = { type: 'SUDDEN_STOP', severity: 'HIGH' };
-        console.warn(`CRITICAL: Sudden Stop Detected - ${(movementDrop * 100).toFixed(1)}% drop from ${avgPrevious.toFixed(2)} to ${avgRecent.toFixed(2)}`);
+        console.warn(`🚨 CRITICAL: Sudden Stop Detected - ${(movementDrop * 100).toFixed(1)}% drop from ${avgPrevious.toFixed(2)} to ${avgRecent.toFixed(2)}`);
+        console.warn(`🚨 Setting anomaly in latestActivityState - listeners will be notified`);
         this.lastSuddenStopTime = Date.now();
         this.highMovementDuration = 0;
         this.walkingSessionActive = false;
@@ -333,12 +334,21 @@ class HARModelService {
     }
 
     // Update global state and notify listeners
+    const previousAnomaly = latestActivityState.anomaly;
     latestActivityState = {
       name: activity,
       confidence: parseFloat(confidence.toFixed(2)),
       isProtectionActive: this.isMonitoring,
       anomaly: anomaly,
     };
+
+    // Log when anomaly state changes
+    if (anomaly && !previousAnomaly) {
+      console.warn(`🚨 NEW ANOMALY SET: ${anomaly.type} - Notifying ${listeners.length} listeners`);
+    } else if (!anomaly && previousAnomaly) {
+      console.log(`✅ Anomaly cleared (was: ${previousAnomaly.type})`);
+    }
+
     notifyListeners();
 
     return latestActivityState;

@@ -5,18 +5,9 @@
   <uses-permission android:name="android.permission.INTERNET"/>
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
   <uses-permission android:name="android.permission.SEND_SMS"/>
-  <uses-permission android:name="android.permission.READ_SMS"/>
-  <uses-permission android:name="android.permission.RECEIVE_SMS"/>
-  <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
-  <uses-permission android:name="android.permission.READ_CONTACTS"/>
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-  
-  <!-- Sensor permissions for HAR model -->
-  <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true"/>
-  <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false"/>
-  <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS"/>
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>

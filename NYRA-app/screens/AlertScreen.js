@@ -27,46 +27,87 @@ export default function AlertScreen({ navigation }) {
     // Trigger a warning haptic feedback when the screen loads
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
 
-    if (countdown > 0) {
-      const timerId = setTimeout(() => {
-        setCountdown(countdown - 1);
-        // Vibrate every second during countdown
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }, 1000);
-      return () => clearTimeout(timerId);
-    } else {
-      // Timer finished, send emergency alerts
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      sendEmergencyAlerts();
-      navigation.navigate('MainTabs', { screen: 'Home' });
-    }
-  }, [countdown, navigation]);
+    // Use setInterval for accurate countdown
+    const intervalId = setInterval(() => {
+      setCountdown((prevCountdown) => {
+        if (prevCountdown > 1) {
+          // Vibrate every second during countdown
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          return prevCountdown - 1;
+        } else {
+          // Timer finished, send emergency alerts
+          clearInterval(intervalId);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          sendEmergencyAlerts();
+          navigation.navigate('MainTabs', { screen: 'Home' });
+          return 0;
+        }
+      });
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [navigation]);
 
   const sendEmergencyAlerts = async () => {
     console.log('🚨 ALERT! Countdown finished. Sending emergency alerts...');
-    
+
     try {
       // Get current location for emergency alerts
-      console.log('📍 Getting current location...');
+      console.log('📍 Getting current location for emergency SMS...');
       const currentLocation = await locationService.getCurrentLocation();
-      console.log('📍 Current location:', currentLocation);
-      
+      console.log('📍 Current location obtained:', currentLocation ? 'Yes' : 'No');
+      if (currentLocation) {
+        console.log(`📍 Coordinates: ${currentLocation.coords.latitude}, ${currentLocation.coords.longitude}`);
+      }
+
+      // Load contacts - use hook contacts if available, otherwise load directly from storage
+      let emergencyContacts = contacts;
+      console.log(`👥 Contacts from hook: ${contacts.length}`);
+
+      if (!emergencyContacts || emergencyContacts.length === 0) {
+        console.log('⚠️ No contacts from hook, loading directly from storage...');
+        const { loadContacts } = require('../services/storageService');
+        emergencyContacts = await loadContacts();
+        console.log(`👥 Contacts loaded from storage: ${emergencyContacts.length}`);
+      }
+
+      if (!emergencyContacts || emergencyContacts.length === 0) {
+        console.error('❌ No emergency contacts found!');
+        Alert.alert(
+          "⚠️ No Emergency Contacts",
+          "No emergency contacts found. Please add contacts in the app settings.",
+          [{ text: "OK" }]
+        );
+        // Stop location service
+        locationService.stopLocationUpdates();
+        return;
+      }
+
       const emergencyMessage = "EMERGENCY: I may need help! This is an automated alert from the NYRA safety app.";
-      
+
       let smsSuccess = false;
       let emailSuccess = false;
 
       // Send SMS alerts if enabled
-      if (settings.sendSmsAlerts && contacts.length > 0) {
-        console.log('📱 Sending SMS alerts with location...');
-        smsSuccess = await smsService.sendEmergencySMS(contacts, currentLocation);
+      if (settings.sendSmsAlerts && emergencyContacts.length > 0) {
+        console.log(`📱 Sending SMS alerts to ${emergencyContacts.length} contacts with location...`);
+        const result = await smsService.sendEmergencySMS(emergencyContacts, currentLocation);
+        smsSuccess = result.success || result === true;
+        console.log(`📱 SMS Result: ${smsSuccess ? 'SUCCESS' : 'FAILED'} - Sent: ${result.sent || 0}, Failed: ${result.failed || 0}`);
+      } else {
+        console.log('📱 SMS alerts disabled or no contacts available');
       }
 
       // Send Email alerts if enabled  
-      if (settings.sendEmailAlerts && contacts.length > 0) {
+      if (settings.sendEmailAlerts && emergencyContacts.length > 0) {
         console.log('📧 Sending Email alerts with location...');
-        emailSuccess = await emailService.sendEmergencyEmail(contacts, currentLocation);
+        emailSuccess = await emailService.sendEmergencyEmail(emergencyContacts, currentLocation);
+        console.log(`📧 Email Result: ${emailSuccess ? 'SUCCESS' : 'FAILED'}`);
       }
+
+      // Stop location service after sending alerts
+      console.log('🛑 Stopping location service after emergency alerts sent');
+      locationService.stopLocationUpdates();
 
       // Show appropriate success/failure message
       if (smsSuccess || emailSuccess) {
@@ -77,14 +118,17 @@ export default function AlertScreen({ navigation }) {
         );
       } else {
         Alert.alert(
-          "⚠️ Alert Warning", 
+          "⚠️ Alert Warning",
           "Could not send emergency alerts. Please contact emergency services manually.",
           [{ text: "OK" }]
         );
       }
-      
+
     } catch (error) {
-      console.error('Error sending alerts:', error);
+      console.error('❌ Error sending alerts:', error);
+      console.error('❌ Error stack:', error.stack);
+      // Stop location service even on error
+      locationService.stopLocationUpdates();
       Alert.alert(
         "❌ Alert Error",
         "There was an error sending alerts. Please contact your emergency contacts manually.",
@@ -96,7 +140,10 @@ export default function AlertScreen({ navigation }) {
   const handleCancel = () => {
     // Success haptic on cancellation
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    console.log('Alert Cancelled by user.');
+    console.log('⚠️ Alert Cancelled by user.');
+    // Stop location service when alert is cancelled
+    locationService.stopLocationUpdates();
+    console.log('🛑 Location service stopped after alert cancellation');
     navigation.goBack();
   };
 
@@ -108,16 +155,16 @@ export default function AlertScreen({ navigation }) {
       style={styles.container}
     >
       <SafeAreaView style={styles.content}>
-        <Text style={{fontSize: 100, color: theme.colors.onError}}>🚨</Text>
-        <Text style={[styles.title, {color: theme.colors.onError}]}>ALERT TRIGGERED!</Text>
-        <Text style={[styles.countdown, {color: theme.colors.onError}]}>{countdown}</Text>
-        <Text style={[styles.subtitle, {color: theme.colors.onError}]}>Sending alert in {countdown} seconds...</Text>
+        <Text style={{ fontSize: 100, color: theme.colors.onError }}>🚨</Text>
+        <Text style={[styles.title, { color: theme.colors.onError }]}>ALERT TRIGGERED!</Text>
+        <Text style={[styles.countdown, { color: theme.colors.onError }]}>{countdown}</Text>
+        <Text style={[styles.subtitle, { color: theme.colors.onError }]}>Sending alert in {countdown} seconds...</Text>
         <Button
           mode="contained"
           onPress={handleCancel}
           icon="cancel"
           style={[styles.cancelButton, { backgroundColor: theme.colors.success }]}
-          labelStyle={[styles.cancelButtonLabel, {color: theme.colors.onPrimary}]}
+          labelStyle={[styles.cancelButtonLabel, { color: theme.colors.onPrimary }]}
         >
           Cancel Alert
         </Button>

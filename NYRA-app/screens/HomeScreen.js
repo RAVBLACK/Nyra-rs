@@ -87,13 +87,41 @@ export default function HomeScreen() {
   };
 
   // Effect to listen for anomalies from the single source of truth
+  const lastAnomalyRef = useRef(null);
+
   useEffect(() => {
-    if (activityState.anomaly && activityState.anomaly.type === 'SUDDEN_STOP') {
-      console.log("SUDDEN STOP DETECTED, TRIGGERING ALERT!");
-      stopMonitoring(); // Stop monitoring to prevent multiple triggers
-      navigation.navigate('Alert');
+    const anomaly = activityState.anomaly;
+
+    // Check if we have a new SUDDEN_STOP anomaly
+    if (anomaly && anomaly.type === 'SUDDEN_STOP') {
+      // Prevent duplicate triggers by checking if this is a new anomaly
+      const anomalyKey = `${anomaly.type}_${Date.now()}`;
+
+      if (lastAnomalyRef.current !== anomalyKey) {
+        lastAnomalyRef.current = anomalyKey;
+
+        console.log("🚨 SUDDEN STOP DETECTED, TRIGGERING ALERT!");
+        console.log("🚨 Anomaly details:", JSON.stringify(anomaly));
+
+        // Stop HAR and sensors but KEEP location running for emergency SMS
+        harModelService.stop();
+        sensorService.stopSensorUpdates();
+
+        // DON'T stop location - we need it for the emergency SMS!
+        console.log("⚠️ Keeping location service active for emergency alert");
+        console.log("🔄 Navigating to Alert screen...");
+
+        try {
+          navigation.navigate('Alert');
+          console.log("✅ Navigation to Alert screen triggered");
+        } catch (error) {
+          console.error("❌ Navigation error:", error);
+        }
+      } else {
+        console.log("⚠️ Duplicate anomaly detected, ignoring");
+      }
     }
-  }, [activityState.anomaly]);
+  }, [activityState, navigation]);
 
 
   // Cleanup on component unmount
@@ -108,11 +136,11 @@ export default function HomeScreen() {
       <View style={styles.content}>
         <View style={styles.header}>
           <Text variant="headlineMedium" style={styles.welcomeTitle}>Welcome to NYRA</Text>
-          <Text variant="bodyMedium" style={[styles.subtitle, {color: theme.colors.onSurfaceVariant}]}>Your personal safety companion.</Text>
+          <Text variant="bodyMedium" style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>Your personal safety companion.</Text>
         </View>
 
         <View style={styles.section}>
-          <ProtectionStatusCard 
+          <ProtectionStatusCard
             isProtected={isMonitoring}
             activity={currentActivity}
             confidence={confidence}
