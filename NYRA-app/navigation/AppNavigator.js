@@ -9,12 +9,14 @@ import ContactsScreen from '../screens/ContactsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ActivityDetectionScreen from '../screens/ActivityDetectionScreen';
 import AlertScreen from '../screens/AlertScreen';
+import SafetyFeaturesScreen from '../screens/SafetyFeaturesScreen';
 
 // --- Create the Bottom Tab Navigator Component ---
 const Tab = BottomNavigation; // Using Paper's BottomNavigation as tabs
 
 const routes = [
   { key: 'home', title: 'Home', focusedIcon: 'home', unfocusedIcon: 'home' },
+  { key: 'safety', title: 'Safety', focusedIcon: 'shield-check', unfocusedIcon: 'shield-outline' },
   { key: 'activity', title: 'Activity', focusedIcon: 'pulse', unfocusedIcon: 'pulse' },
   { key: 'contacts', title: 'Contacts', focusedIcon: 'phone', unfocusedIcon: 'phone' },
   { key: 'settings', title: 'Settings', focusedIcon: 'settings', unfocusedIcon: 'settings' },
@@ -22,6 +24,7 @@ const routes = [
 
 const sceneMap = Tab.SceneMap({
   home: HomeScreen,
+  safety: SafetyFeaturesScreen,
   activity: ActivityDetectionScreen,
   contacts: ContactsScreen,
   settings: SettingsScreen,
@@ -40,6 +43,9 @@ function TabNavigator() {
         switch (route.key) {
           case 'home':
             emoji = '🏠';
+            break;
+          case 'safety':
+            emoji = '🛡️';
             break;
           case 'activity':
             emoji = '📈';
